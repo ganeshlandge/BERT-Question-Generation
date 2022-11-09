@@ -28,24 +28,38 @@ def get_config():
     parser = argparse.ArgumentParser()
 
     """init options"""
-    parser.add_argument("--seed", type=int, default=42, help="random seed (default: 42)")
-    parser.add_argument("--model", type=str, default="bert-base-uncased", help="(default: bert-base-uncased)")
-    parser.add_argument("--wandb_name", type=str, default="BERT-HLSQG", help="(default: )")
+    parser.add_argument("--seed", type=int, default=42,
+                        help="random seed (default: 42)")
+    parser.add_argument("--model", type=str, default="bert-base-uncased",
+                        help="(default: bert-base-uncased)")
+    parser.add_argument("--wandb_name", type=str,
+                        default="BERT-HLSQG", help="(default: )")
 
     """train options"""
-    parser.add_argument("--train_data_path", type=str, default="./data/squad_nqg/train.json", help="(default: ./data/squad_nqg/train.json)")
-    parser.add_argument("--train_pickle_path", type=str, default="./squad_train.pickle", help="(default: squad_train.pickle)")
-    parser.add_argument("--num_train_epochs", type=int, default=10, help="(default: 5)")
-    parser.add_argument("--learning_rate", type=float, default=5e-5, help="learning rage (default: 5e-5)")
-    parser.add_argument("--batch_size", type=int, default=32, help="(default: 32)")
+    parser.add_argument("--train_data_path", type=str, default="./data/squad_nqg/train.json",
+                        help="(default: ./data/squad_nqg/train.json)")
+    parser.add_argument("--train_pickle_path", type=str,
+                        default="./squad_train.pickle", help="(default: squad_train.pickle)")
+    parser.add_argument("--num_train_epochs", type=int,
+                        default=10, help="(default: 5)")
+    parser.add_argument("--learning_rate", type=float,
+                        default=5e-5, help="learning rage (default: 5e-5)")
+    parser.add_argument("--batch_size", type=int,
+                        default=32, help="(default: 32)")
 
     # not frequently used
-    parser.add_argument("--adam_epsilon", type=float, default=1e-8, help="(default: )")
-    parser.add_argument("--max_grad_norm", type=float, default=1.0, help="(default: )")
-    parser.add_argument("--weight_decay", type=float, default=0.0, help="(default: )")
-    parser.add_argument("--warmup_steps", type=float, default=0.0, help="(default: )")
-    parser.add_argument("--max_steps", type=int, default=-1, help="(default: )")
-    parser.add_argument("--gradient_accumulation_steps", type=int, default=1, help="(default: )")
+    parser.add_argument("--adam_epsilon", type=float,
+                        default=1e-8, help="(default: )")
+    parser.add_argument("--max_grad_norm", type=float,
+                        default=1.0, help="(default: )")
+    parser.add_argument("--weight_decay", type=float,
+                        default=0.0, help="(default: )")
+    parser.add_argument("--warmup_steps", type=float,
+                        default=0.0, help="(default: )")
+    parser.add_argument("--max_steps", type=int,
+                        default=-1, help="(default: )")
+    parser.add_argument("--gradient_accumulation_steps",
+                        type=int, default=1, help="(default: )")
 
     # parser.add_argument("", type=, default=, help="(default: )")
 
@@ -63,7 +77,8 @@ def prepare_train_dataset(args, device, tokenizer):
             example_list = pickle.load(f)
         print("*** finished to load train pickle file!")
     else:
-        example_list = load_dataset.make_data_pickle(args.train_data_path, args.train_pickle_path)
+        example_list = load_dataset.make_data_pickle(
+            args.train_data_path, args.train_pickle_path)
 
     print(f"***train_len: {len(example_list)}")
 
@@ -76,8 +91,10 @@ def prepare_train_dataset(args, device, tokenizer):
     train_label_list = load_dataset.make_labels(pad_len, train_label)
 
     data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
-    train_dataloader = DataLoader(SquadDataset(train_tokenized, train_label_list), shuffle=True, batch_size=args.batch_size, collate_fn=data_collator)
-    t_total = len(train_tokenized) // args.gradient_accumulation_steps * args.num_train_epochs
+    train_dataloader = DataLoader(SquadDataset(train_tokenized, train_label_list),
+                                  shuffle=True, batch_size=args.batch_size, collate_fn=data_collator)
+    t_total = len(
+        train_tokenized) // args.gradient_accumulation_steps * args.num_train_epochs
 
     # check dataloader
     try:
@@ -104,7 +121,8 @@ def train(args):
         "batch_size": args.batch_size,
         "num_train_epochs": args.num_train_epochs,
     }
-    wandb.init(project="BERT-HLSQG", entity="minji913", name=args.wandb_name, group=args.model, config=config)
+    wandb.init(project="BERT-HLSQG", name=args.wandb_name,
+               group=args.model, config=config)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Current cuda device:", torch.cuda.current_device())
@@ -115,7 +133,8 @@ def train(args):
     model.to(device)
 
     # add [HL], [/HL] token
-    added_token_num = tokenizer.add_special_tokens({"additional_special_tokens": ["[HL]", "[/HL]"]})
+    added_token_num = tokenizer.add_special_tokens(
+        {"additional_special_tokens": ["[HL]", "[/HL]"]})
     # add token number
     model.resize_token_embeddings(tokenizer.vocab_size + added_token_num)
 
@@ -123,17 +142,21 @@ def train(args):
     model = nn.DataParallel(model)
 
     t_total, train_dataloader = prepare_train_dataset(args, device, tokenizer)
-    print(f"***t_total: {t_total}, len train_dataloader: {len(train_dataloader)}")
+    print(
+        f"***t_total: {t_total}, len train_dataloader: {len(train_dataloader)}")
     no_decay = ["bias", "LayerNorm.weight"]
     optimizer_grouped_parameters = [
         {
             "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
             "weight_decay": args.weight_decay,
         },
-        {"params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], "weight_decay": args.weight_decay},
+        {"params": [p for n, p in model.named_parameters() if any(
+            nd in n for nd in no_decay)], "weight_decay": args.weight_decay},
     ]
-    optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate, eps=args.adam_epsilon)
-    scheduler = get_linear_schedule_with_warmup(optimizer, num_warmup_steps=args.warmup_steps, num_training_steps=t_total)
+    optimizer = AdamW(optimizer_grouped_parameters,
+                      lr=args.learning_rate, eps=args.adam_epsilon)
+    scheduler = get_linear_schedule_with_warmup(
+        optimizer, num_warmup_steps=args.warmup_steps, num_training_steps=t_total)
 
     model.train()
 
@@ -149,7 +172,8 @@ def train(args):
             loss.mean().backward()
             optimizer.step()
             optimizer.zero_grad()
-            train_loader.set_description("Loss %.04f | step %d" % (loss.mean(), j))
+            train_loader.set_description(
+                "Loss %.04f | step %d" % (loss.mean(), j))
             wandb.log({"train_loss": loss.mean()})
         torch.save(model.state_dict(), f"model_weights_{epoch}_{eveloss}.pth")
         print("epoch " + str(epoch) + " : " + str(eveloss))
